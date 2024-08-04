@@ -1,6 +1,6 @@
-// backend/routes/auth.js
 const express = require('express');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const router = express.Router();
 const connection = require('../db');
 
@@ -13,26 +13,81 @@ router.get('/', (req, res) => {
 router.post('/register', async (req, res) => {
   const { username, email, phoneNumber, password, confirmPassword } = req.body;
 
-  /*if (!username || !email || !phoneNumber || !password || !confirmPassword) {
+  if (!username || !email || !phoneNumber || !password || !confirmPassword) {
     return res.status(400).json({ message: 'Tous les champs sont obligatoires' });
-  }*/
- 
+  }
 
   if (password !== confirmPassword) {
     return res.status(400).json({ message: 'Les mots de passe ne correspondent pas' });
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+  try {
+    // Vérifier si l'email est déjà utilisé
+    const checkEmailQuery = 'SELECT * FROM client WHERE email = ?';
+    connection.query(checkEmailQuery, [email], (err, results) => {
+      if (err) {
+        console.error('Error checking email:', err);
+        return res.status(500).json({ message: 'Erreur lors de la vérification de l\'email' });
+      }
 
-  const query = `INSERT INTO client (nom_utilisation, email, password, Numero_téléphone) VALUES (?, ?, ?, ?)`;
-  const values = [username, email, hashedPassword, phoneNumber];
+      if (results.length > 0) {
+        return res.status(400).json({ message: 'Cet email est déjà utilisé' });
+      }
 
-  connection.query(query, values, (err, results) => {
+      // Hacher le mot de passe
+      bcrypt.hash(password, 10, (err, hashedPassword) => {
+        if (err) {
+          console.error('Error hashing password:', err);
+          return res.status(500).json({ message: 'Erreur lors du hachage du mot de passe' });
+        }
+
+        // Insérer le nouvel utilisateur
+        const insertQuery = 'INSERT INTO client (nom_utilisation, email, password, Numero_téléphone) VALUES (?, ?, ?, ?)';
+        const values = [username, email, hashedPassword, phoneNumber];
+
+        connection.query(insertQuery, values, (err, results) => {
+          if (err) {
+            console.error('Error inserting user:', err);
+            return res.status(500).json({ message: 'Erreur lors de l\'inscription' });
+          }
+
+          res.status(201).json({ message: `Inscription réussie pour ${username}` });
+        });
+      });
+    });
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    res.status(500).json({ message: 'Erreur inattendue' });
+  }
+});
+
+// Route pour la connexion
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Veuillez fournir un email et un mot de passe' });
+  }
+
+  connection.query('SELECT * FROM client WHERE email = ?', [email], async (err, results) => {
     if (err) {
-      console.error('Error inserting user:', err);
-      return res.status(500).json({ message: 'Erreur lors de l\'inscription' });
+      console.error('Error querying the database:', err);
+      return res.status(500).json({ message: 'Erreur interne du serveur' });
     }
-    res.status(201).json({ message: `Inscription réussie pour ${username}` });
+    if (results.length === 0) {
+      return res.status(401).json({ message: 'Email ou mot de passe incorrect' });
+    }
+
+    const user = results[0];
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Email ou mot de passe incorrect' });
+    }
+
+    const token = jwt.sign({ id: user.id }, 'your_jwt_secret', { expiresIn: '1h' });
+
+    res.status(200).json({ message: 'Connexion réussie', token });
   });
 });
 
