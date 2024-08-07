@@ -4,8 +4,9 @@ const port = process.env.PORT || 3300;
 const bodyParser = require('body-parser');
 const connection = require('./db');
 
-// Importer les routes d'authentification
+// Importer les routes 
 const authRoutes = require('./routes/auth');
+const adresseRoutes = require('./routes/adresses');
 
 app.use(express.json());
 
@@ -18,8 +19,9 @@ app.get('/', (req, res) => {
   res.send('Bonjour');
 });
 
-// Utiliser les routes d'authentification
+// routes
 app.use('/auth', authRoutes);
+app.use('/adresses', adresseRoutes);
 
 // Démarrer le serveur
 app.listen(port, () => {
