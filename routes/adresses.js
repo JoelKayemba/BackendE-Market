@@ -4,54 +4,80 @@ const connection = require('../db');
 
 // Route pour ajouter une adresse
 router.post('/', async (req, res) => {
-  const {
-    userId,
-    pays,
-    province,
-    ville,
-    rue,
-    numero,
-    codePostal,
-    appartement,
-    latitude,
-    longitude,
-    parDefaut
-  } = req.body;
-
-  try {
-    const insertAddressQuery = `
-      INSERT INTO adresse (
-        pays, province, ville, rue, numéro, code_postal, appartement, latitude, longitude, parDefaut, idclient
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    const values = [
-      pays, province, ville, rue, numero, codePostal, appartement, latitude, longitude, parDefaut, userId
-    ];
-
-    connection.query(insertAddressQuery, values, async (err, results) => {
-      if (err) {
-        console.error('Erreur lors de l\'insertion de l\'adresse:', err);
-        return res.status(500).json({ message: 'Erreur lors de l\'ajout de l\'adresse' });
-      }
-
-      if (!results.insertId) {
-        return res.status(500).json({ message: 'ID manquant pour l\'adresse ajoutée' });
-      }
-
-      const selectAddressQuery = 'SELECT * FROM adresse WHERE idadresse = ?';
-      connection.query(selectAddressQuery, [results.insertId], (err, rows) => {
+    const {
+      userId,
+      pays,
+      province,
+      ville,
+      rue,
+      numero,
+      codePostal,
+      appartement,
+      latitude,
+      longitude,
+      parDefaut
+    } = req.body;
+  
+    try {
+      // Requête pour insérer l'adresse
+      const insertAddressQuery = `
+        INSERT INTO adresse (
+          pays, province, ville, rue, numéro, code_postal, appartement, latitude, longitude, parDefaut, idclient
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      const values = [
+        pays, province, ville, rue, numero, codePostal, appartement, latitude, longitude, parDefaut, userId
+      ];
+  
+      connection.query(insertAddressQuery, values, (err, results) => {
         if (err) {
-          console.error('Erreur lors de la récupération des détails de l\'adresse:', err);
-          return res.status(500).json({ message: 'Erreur lors de la récupération des détails de l\'adresse' });
+          console.error('Erreur lors de l\'insertion de l\'adresse:', err);
+          return res.status(500).json({ message: 'Erreur lors de l\'ajout de l\'adresse' });
+        }
+  
+        // Vérifier si l'insertion a réussi et obtenir l'ID de l'adresse insérée
+        const addressId = results.insertId;
+        if (!addressId) {
+          return res.status(500).json({ message: 'ID manquant pour l\'adresse ajoutée' });
+        }
+  
+        // Récupérer les détails de l'adresse ajoutée
+        const selectAddressQuery = 'SELECT * FROM adresse WHERE idadresse = ?';
+        connection.query(selectAddressQuery, [addressId], (err, rows) => {
+          if (err) {
+            console.error('Erreur lors de la récupération des détails de l\'adresse:', err);
+            return res.status(500).json({ message: 'Erreur lors de la récupération des détails de l\'adresse' });
+          }
+  
+          // Envoyer la réponse avec l'adresse ajoutée
+          res.status(201).json({ idadresse: addressId, adresse: rows[0] });
+        });
+      });
+    } catch (error) {
+      console.error('Erreur inattendue:', error);
+      res.status(500).json({ message: 'Erreur inattendue' });
+    }
+  });
+  
+
+// Route pour récupérer les adresses d'un utilisateur spécifique
+router.get('/', (req, res) => {
+    const userId = req.query.userId;
+
+    if (!userId) {
+        return res.status(400).json({ message: 'ID du client manquant' });
+    }
+
+    const query = 'SELECT * FROM adresse WHERE idclient = ?';
+
+    connection.query(query, [userId], (err, results) => {
+        if (err) {
+            console.error('Erreur lors de la récupération des adresses :', err);
+            return res.status(500).json({ message: 'Erreur lors du chargement des adresses' });
         }
 
-        res.status(201).json(rows[0]);
-      });
+        res.json(results);
     });
-  } catch (error) {
-    console.error('Erreur inattendue:', error);
-    res.status(500).json({ message: 'Erreur inattendue' });
-  }
 });
 
 // Route pour mettre à jour une adresse par défaut
@@ -150,7 +176,7 @@ router.put('/:id', async (req, res) => {
       connection.query(updateAddressQuery, values, (err) => {
         if (err) {
           console.error('Erreur lors de la mise à jour de l\'adresse:', err);
-          return res.status(500).json({ message: 'Erreur lors de la mise à jour de l\'adresse' });
+          return res.status(500).json({ message: 'Erreur lors de la mise à jour de l\'adresseb' });
         }
 
         const selectAddressQuery = 'SELECT * FROM adresse WHERE idadresse = ?';
@@ -169,5 +195,38 @@ router.put('/:id', async (req, res) => {
     res.status(500).json({ message: 'Erreur inattendue' });
   }
 });
+
+
+// route pour supprimer une adresse
+router.delete('/:id/supprimer', async (req, res) => {
+    const { id } = req.params;
+  
+    try {
+      const checkAddressQuery = 'SELECT * FROM adresse WHERE idadresse = ?';
+      connection.query(checkAddressQuery, [id], (err, results) => {
+        if (err) {
+          console.error('Erreur lors de la vérification de l\'adresse:', err);
+          return res.status(500).json({ message: 'Erreur lors de la vérification de l\'adresse' });
+        }
+  
+        if (results.length === 0) {
+          return res.status(404).json({ message: 'Adresse non trouvée.' });
+        }
+  
+        const deleteAddressQuery = 'DELETE FROM adresse WHERE idadresse = ?';
+        connection.query(deleteAddressQuery, [id], (err) => {
+          if (err) {
+            console.error('Erreur lors de la suppression de l\'adresse:', err);
+            return res.status(500).json({ message: 'Erreur lors de la suppression de l\'adresse' });
+          }
+  
+          res.status(200).json({ message: 'Adresse supprimée avec succès.' });
+        });
+      });
+    } catch (error) {
+      console.error('Erreur inattendue:', error);
+      res.status(500).json({ message: 'Erreur inattendue' });
+    }
+  });
 
 module.exports = router;
