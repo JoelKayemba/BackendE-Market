@@ -7,6 +7,9 @@ const connection = require('./db');
 // Importer les routes 
 const authRoutes = require('./routes/auth');
 const adresseRoutes = require('./routes/adresses');
+const profilRoutes= require('./routes/profil');
+const EmailRoutes= require('./routes/EnvoieEmail');
+
 
 app.use(express.json());
 
@@ -22,6 +25,9 @@ app.get('/', (req, res) => {
 // routes
 app.use('/auth', authRoutes);
 app.use('/adresses', adresseRoutes);
+app.use('/profil', profilRoutes);
+app.use('/sendEmail', EmailRoutes)
+
 
 // Démarrer le serveur
 app.listen(port, () => {
