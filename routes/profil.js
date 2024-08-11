@@ -7,7 +7,7 @@ router.put('/modifier', async (req, res) => {
     const { idclient, prenom, sexe, date_naissance, email, nom_utilisation } = req.body;
 
     if (!idclient || !email || !nom_utilisation) {
-        return res.status(400).json({ message: 'ID client, email et nom d\'utilisateur sont obligatoires' });
+        return res.status(400).json({ message: 'Email et nom d\'utilisateur sont obligatoires' });
     }
 
     try {
@@ -85,6 +85,7 @@ router.get('/', async (req, res) => {
     }
 });
 
+// route pour supprimer le compte
 router.delete('/supprimer', async (req, res) => {
     const { idclient } = req.body;
 
@@ -101,7 +102,7 @@ router.delete('/supprimer', async (req, res) => {
                 return res.status(500).json({ message: 'Erreur lors de la suppression du profil' });
             }
 
-            // Ensuite, supprimer les adresses de l'utilisateur (si applicable)
+            // Ensuite, supprimer les adresses de l'utilisateur 
             const deleteAdresseQuery = 'DELETE FROM adresse WHERE idclient = ?';
             connection.query(deleteAdresseQuery, [idclient], (err) => {
                 if (err) {
