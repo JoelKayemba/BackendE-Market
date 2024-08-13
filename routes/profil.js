@@ -4,10 +4,10 @@ const connection = require('../db');
 
 // Route pour mettre à jour les informations de profil
 router.put('/modifier', async (req, res) => {
-    const { idclient, prenom, sexe, date_naissance, email, nom_utilisation } = req.body;
+    const { idclient, prenom, sexe, date_naissance, email, nom_utilisation, numero_telephone } = req.body;
 
-    if (!idclient || !email || !nom_utilisation) {
-        return res.status(400).json({ message: 'Email et nom d\'utilisateur sont obligatoires' });
+    if (!idclient || !email || !nom_utilisation || !numero_telephone) {
+        return res.status(400).json({ message: 'Email, nom d\'utilisateur, et numéro de telephone sont obligatoires' });
     }
 
     try {
@@ -30,11 +30,11 @@ router.put('/modifier', async (req, res) => {
                     return res.status(500).json({ message: 'Erreur lors de l\'ajout du nouveau profil' });
                 }
 
-                // Mise à jour des informations du client (email et nom d'utilisateur)
+                // Mise à jour des informations du client (email, nom d'utilisateur, numéro de téléphone)
                 const updateClientQuery = `
-                    UPDATE client SET email = ?, nom_utilisation = ? WHERE idclient = ?
+                    UPDATE client SET email = ?, nom_utilisation = ?, numero_telephone = ? WHERE idclient = ?
                 `;
-                connection.query(updateClientQuery, [email, nom_utilisation, idclient], (err) => {
+                connection.query(updateClientQuery, [email, nom_utilisation, numero_telephone, idclient], (err) => {
                     if (err) {
                         console.error('Erreur lors de la mise à jour du client:', err);
                         return res.status(500).json({ message: 'Erreur lors de la mise à jour du client' });
@@ -50,8 +50,7 @@ router.put('/modifier', async (req, res) => {
     }
 });
 
-
-// pour recuperer les informations
+// Route pour récupérer les informations de profil
 router.get('/', async (req, res) => {
     const { idclient } = req.query;
 
@@ -61,7 +60,7 @@ router.get('/', async (req, res) => {
 
     try {
         const profilQuery = `
-            SELECT c.email, c.nom_utilisation, p.prenom, p.sexe, p.date_naissance 
+            SELECT c.email, c.nom_utilisation, c.numero_telephone, p.prenom, p.sexe, p.date_naissance 
             FROM client c 
             LEFT JOIN profil p ON c.idclient = p.idclient 
             WHERE c.idclient = ?
@@ -84,6 +83,7 @@ router.get('/', async (req, res) => {
         res.status(500).json({ message: 'Erreur inattendue' });
     }
 });
+
 
 // route pour supprimer le compte
 router.delete('/supprimer', async (req, res) => {

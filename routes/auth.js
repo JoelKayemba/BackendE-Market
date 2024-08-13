@@ -39,7 +39,7 @@ router.post('/register', async (req, res) => {
           return res.status(500).json({ message: 'Erreur lors du hachage du mot de passe' });
         }
 
-        const insertQuery = 'INSERT INTO client (nom_utilisation, email, password, Numero_téléphone) VALUES (?, ?, ?, ?)';
+        const insertQuery = 'INSERT INTO client (nom_utilisation, email, password, numero_telephone) VALUES (?, ?, ?, ?)';
         const values = [username, email, hashedPassword, phoneNumber];
 
         connection.query(insertQuery, values, (err, results) => {
