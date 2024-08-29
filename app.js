@@ -10,7 +10,8 @@ const authRoutes = require('./routes/auth');
 const adresseRoutes = require('./routes/adresses');
 const profilRoutes= require('./routes/profil');
 const EmailRoutes= require('./routes/EnvoieEmail');
-const annonceRoutes= require('./routes/annonceRoutes')
+const annonceRoutes= require('./routes/annonceRoutes');
+const ajoutBoutique= require('./routes/AjoutBoutique')
 
 app.use(express.json());
 
@@ -31,8 +32,8 @@ app.use('/auth', authRoutes);
 app.use('/adresses', adresseRoutes);
 app.use('/profil', profilRoutes);
 app.use('/sendEmail', EmailRoutes);
-app.use('/annonce', annonceRoutes)
-
+app.use('/annonce', annonceRoutes);
+app.use('/boutique', ajoutBoutique);
 
 // Démarrer le serveur
 app.listen(port, () => {

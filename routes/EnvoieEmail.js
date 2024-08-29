@@ -94,7 +94,7 @@ router.post('/verifyCode', async (req, res) => {
         const user = results[0];
         const now = Date.now();
 
-        // Assurez-vous que la comparaison est entre des entiers
+        // Assure que la comparaison est entre des entiers
         if (user.reset_code !== parseInt(code, 10)) {
             return res.status(400).json({ message: 'Code de vérification incorrect' });
         }
