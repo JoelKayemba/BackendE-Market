@@ -14,11 +14,11 @@ router.post('/stripe-webhook', bodyParser.raw({ type: 'application/json' }), (re
     try {
         event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
     } catch (err) {
-        console.log(`⚠️  Webhook signature verification failed.`, err.message);
+        console.log(`⚠️  Webhook signature verification failed.`, err.message); 
         return res.sendStatus(400);
     }
 
-    // Handle the event
+    // Handle the event 
     if (event.type === 'checkout.session.completed') {
         const session = event.data.object;
 
