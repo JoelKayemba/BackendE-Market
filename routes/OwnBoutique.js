@@ -1,5 +1,5 @@
 const express = require('express');
-const connection = require('../db'); // Assurez-vous que la connexion à la base de données est bien configurée
+const connection = require('../db');   
 
 // Création du routeur Express
 const router = express.Router();

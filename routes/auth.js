@@ -39,7 +39,7 @@ router.post('/register', async (req, res) => {
           return res.status(500).json({ message: 'Erreur lors du hachage du mot de passe' });
         }
 
-        const insertQuery = 'INSERT INTO client (nom_utilisation, email, password, numero_telephone) VALUES (?, ?, ?, ?)';
+        const insertQuery = 'INSERT INTO client (username, email, motDePasse, telephone) VALUES (?, ?, ?, ?)';
         const values = [username, email, hashedPassword, phoneNumber];
 
         connection.query(insertQuery, values, (err, results) => {
@@ -77,21 +77,21 @@ router.post('/login', async (req, res) => {
 
     const user = results[0];
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await bcrypt.compare(password, user.motDePasse);
     if (!isPasswordValid) {
       return res.status(401).json({ message: 'Email ou mot de passe incorrect' });
     }
 
     // Créer le token JWT
-    const token = jwt.sign({ id: user.idclient }, 'your_jwt_secret', { expiresIn: '1h' });
+    const token = jwt.sign({ id: user.idClient }, 'your_jwt_secret', { expiresIn: '1h' });
 
     // Répondre avec le token, l'ID utilisateur, l'email et le nom d'utilisation
     res.status(200).json({ 
       message: 'Connexion réussie', 
       token, 
-      userId: user.idclient, 
+      userId: user.idClient, 
       email: user.email, 
-      username: user.nom_utilisation 
+      username: user.username 
     });
   });
 });

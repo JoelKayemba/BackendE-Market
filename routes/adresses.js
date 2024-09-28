@@ -20,7 +20,7 @@ router.post('/', async (req, res) => {
 
   try {
       // Étape 1 : Supprimer toutes les adresses existantes pour cet utilisateur
-      const deleteAddressesQuery = 'DELETE FROM adresse WHERE idclient = ?';
+      const deleteAddressesQuery = 'DELETE FROM adresse WHERE idClient = ?';
       connection.query(deleteAddressesQuery, [userId], (err) => {
           if (err) {
               console.error('Erreur lors de la suppression des anciennes adresses:', err);
@@ -30,7 +30,7 @@ router.post('/', async (req, res) => {
           // Étape 2 : Ajouter la nouvelle adresse
           const insertAddressQuery = `
               INSERT INTO adresse (
-                  pays, province, ville, rue, numero, code_postal, appartement, latitude, longitude, parDefaut, idclient
+                  pays, province, ville, rue, numero, code_postal, appartement, latitude, longitude, parDefaut, idClient
               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
           const values = [
@@ -77,7 +77,7 @@ router.get('/', (req, res) => {
       return res.status(400).json({ message: 'ID du client manquant' });
   }
 
-  const query = 'SELECT * FROM adresse WHERE idclient = ?';
+  const query = 'SELECT * FROM adresse WHERE idClient = ?';
 
   connection.query(query, [userId], (err, results) => {
       if (err) {
@@ -150,7 +150,7 @@ router.patch('/:id/parDefaut', async (req, res) => {
 
             const userId = results[0].idclient;
 
-            const updateAllAddressesQuery = 'UPDATE adresse SET parDefaut = 0 WHERE idclient = ?';
+            const updateAllAddressesQuery = 'UPDATE adresse SET parDefaut = 0 WHERE idClient = ?';
             connection.query(updateAllAddressesQuery, [false, userId], (err) => {
                 if (err) {
                     console.error('Erreur lors de la mise à jour des adresses de l\'utilisateur:', err);
@@ -249,38 +249,7 @@ router.put('/:id', async (req, res) => {
   });
   
 
-// route pour supprimer une adresse
-router.delete('/:id/supprimer', async (req, res) => {
-    const { id } = req.params;
 
-    try {
-        const checkAddressQuery = 'SELECT * FROM adresse WHERE idadresse = ?';
-        connection.query(checkAddressQuery, [id], (err, results) => {
-            if (err) {
-                console.error('Erreur lors de la vérification de l\'adresse:', err);
-                return res.status(500).json({ message: 'Erreur lors de la vérification de l\'adresse' });
-            }
-
-            if (results.length === 0) {
-                return res.status(404).json({ message: 'Adresse non trouvée.' });
-            }
-
-            const deleteAddressQuery = 'DELETE FROM adresse WHERE idadresse = ?';
-            connection.query(deleteAddressQuery, [id], (err) => {
-                if (err) {
-                    console.error('Erreur lors de la suppression de l\'adresse:', err);
-                    return res.status(500).json({ message: 'Erreur lors de la suppression de l\'adresse' });
-                }
-
-                // Renvoie l'ID de l'adresse supprimée pour confirmation
-                res.status(200).json({ message: 'Adresse supprimée avec succès.', idadresse: id });
-            });
-        });
-    } catch (error) {
-        console.error('Erreur inattendue:', error);
-        res.status(500).json({ message: 'Erreur inattendue' });
-    }
-});
 
 
 module.exports = router;
