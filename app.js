@@ -13,7 +13,8 @@ const EmailRoutes= require('./routes/EnvoieEmail');
 const annonceRoutes= require('./routes/annonceRoutes');
 const ajoutBoutique= require('./routes/AjoutBoutique');
 const ownBoutique = require('./routes/OwnBoutique');
-const categories= require('./routes/categories')
+const categories= require('./routes/categories');
+const ajoutProduit= require('./routes/AjoutProduit')
 //const ownPrestataire = require('./routes/OwnPrestataire');
 
 app.use(express.json());
@@ -39,6 +40,7 @@ app.use('/annonce', annonceRoutes);
 app.use('/boutique', ajoutBoutique);
 app.use('/ownBoutique' , ownBoutique);
 app.use('/categorie', categories);
+app.use('/produit', ajoutProduit);
 //app.use('/ownPrestataire', ownPrestataire);
 
 // Démarrer le serveur
