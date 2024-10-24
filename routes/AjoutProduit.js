@@ -192,8 +192,10 @@ router.post('/ajoutProduit', upload.array('images', 10), (req, res) => {
           nom: results[0].nom,
           description: results[0].description,
           prix: results[0].prix,
-          image_url: results[0].image_url,
+          image_url: results.map(row => row.image_url) 
         };
+
+        
 
         res.status(201).json(produitAjoute);  // Renvoie les informations du produit ajouté
       });
@@ -203,7 +205,8 @@ router.post('/ajoutProduit', upload.array('images', 10), (req, res) => {
     });
 });
 
-// Route pour récupérer les produits d'une boutique
+
+// Route pour récupérer les produits d'une boutique avec les catégories associées et les images en tableau
 router.get('/produitsBoutique/:idBoutique', (req, res) => {
   const { idBoutique } = req.params;
 
@@ -217,15 +220,18 @@ router.get('/produitsBoutique/:idBoutique', (req, res) => {
       p.nom, 
       p.description, 
       p.prix, 
-      p.Boutique_idBoutique, 
-      i.url AS image_url,
+      GROUP_CONCAT(DISTINCT i.url) AS images,  -- Concaténer les images en une seule chaîne
       c.color AS couleur, 
-      s.size AS taille
+      s.size AS taille,
+      cat.nom AS categorie
     FROM produit p
     LEFT JOIN image i ON p.idProduit = i.Produit_idProduit
     LEFT JOIN ProduitColor c ON p.idProduit = c.Produit_idProduit
     LEFT JOIN ProduitSize s ON p.idProduit = s.Produit_idProduit
+    LEFT JOIN ProduitCategorie pc ON p.idProduit = pc.Produit_idProduit
+    LEFT JOIN Categorie cat ON pc.Categorie_idCategorie = cat.idCategorie
     WHERE p.Boutique_idBoutique = ?
+    GROUP BY p.idProduit, c.color, s.size, cat.nom
   `;
 
   connection.query(sql, [idBoutique], (err, results) => {
@@ -234,18 +240,251 @@ router.get('/produitsBoutique/:idBoutique', (req, res) => {
       return res.status(500).json({ message: 'Erreur lors de la récupération des produits' });
     }
 
-    const produits = results.map(row => ({
-      idProduit: row.idProduit,
-      nom: row.nom,
-      description: row.description,
-      prix: row.prix,
-      image: row.image_url,
-      couleur: row.couleur,
-      taille: row.taille,
-    }));
+    const produits = results.reduce((acc, row) => {
+      const existingProduct = acc.find((prod) => prod.idProduit === row.idProduit);
+    
+      if (existingProduct) {
+        // Ajouter la catégorie si elle n'est pas déjà incluse
+        if (!existingProduct.categories.includes(row.categorie)) {
+          existingProduct.categories.push(row.categorie);
+        }
+    
+        // Ajouter la couleur si elle n'est pas déjà incluse
+        if (row.couleur && !existingProduct.couleurs.includes(row.couleur)) {
+          existingProduct.couleurs.push(row.couleur);
+        }
+    
+        // Ajouter la taille si elle n'est pas déjà incluse
+        if (row.taille && !existingProduct.tailles.includes(row.taille)) {
+          existingProduct.tailles.push(row.taille);
+        }
+    
+      } else {
+        acc.push({
+          idProduit: row.idProduit,
+          nom: row.nom,
+          description: row.description,
+          prix: row.prix,
+          images: row.images ? row.images.split(',') : [],  // Convertir la chaîne en tableau d'images
+          couleurs: row.couleur ? [row.couleur] : [],  // Initialiser un tableau pour les couleurs
+          tailles: row.taille ? [row.taille] : [],     // Initialiser un tableau pour les tailles
+          categories: row.categorie ? [row.categorie] : [] // Créer un tableau de catégories
+        });
+      }
+      return acc;
+    }, []);
+    
 
     res.status(200).json(produits);
   });
 });
+
+
+
+router.put('/modifierProduit/:idProduit', upload.array('images', 10), (req, res) => {
+  const { nom, description, prix, idBoutique, colors, sizes } = req.body;
+  let categories;
+
+  // S'assurer que les catégories sont un tableau JSON valide
+  try {
+    categories = JSON.parse(req.body.categories);
+  } catch (error) {
+    return res.status(400).json({ message: 'Les catégories doivent être un tableau JSON valide' });
+  }
+
+  // Mise à jour du produit dans la base de données
+  const updateProduit = () => {
+    return new Promise((resolve, reject) => {
+      const sqlUpdateProduit = `
+        UPDATE produit 
+        SET nom = ?, description = ?, prix = ?, Boutique_idBoutique = ? 
+        WHERE idProduit = ?
+      `;
+      connection.query(sqlUpdateProduit, [nom, description, prix, idBoutique, req.params.idProduit], (err, result) => {
+        if (err) {
+          console.error('Erreur lors de la mise à jour du produit:', err);
+          return reject('Erreur lors de la mise à jour du produit');
+        }
+        resolve();
+      });
+    });
+  };
+
+  // Mise à jour des catégories
+  const updateCategories = (idProduit) => {
+    return new Promise((resolve, reject) => {
+      if (categories && categories.length > 0) {
+        const sqlDeleteCategories = `DELETE FROM ProduitCategorie WHERE Produit_idProduit = ?`;
+        connection.query(sqlDeleteCategories, [idProduit], (err) => {
+          if (err) {
+            console.error('Erreur lors de la suppression des anciennes catégories:', err);
+            return reject('Erreur lors de la suppression des anciennes catégories');
+          }
+
+          const categoryValues = categories.map(cat => [idProduit, cat]);
+          const sqlInsertCategories = `INSERT INTO ProduitCategorie (Produit_idProduit, Categorie_idCategorie) VALUES ?`;
+          connection.query(sqlInsertCategories, [categoryValues], (err) => {
+            if (err) {
+              console.error('Erreur lors de l\'ajout des nouvelles catégories:', err);
+              return reject('Erreur lors de l\'ajout des nouvelles catégories');
+            }
+            resolve();
+          });
+        });
+      } else {
+        resolve(); // Si pas de catégories, ne rien changer
+      }
+    });
+  };
+
+  
+
+   // Mise à jour des tailles du produit
+   const updateSizes = (idProduit) => {
+    return new Promise((resolve, reject) => {
+      if (sizes && sizes.length > 0) {
+        // Supprimer les anciennes tailles associées
+        const sqlDeleteSizes = `DELETE FROM ProduitSize WHERE Produit_idProduit = ?`;
+        connection.query(sqlDeleteSizes, [idProduit], (err) => {
+          if (err) {
+            console.error('Erreur lors de la suppression des anciennes tailles:', err);
+            return reject('Erreur lors de la suppression des anciennes tailles');
+          }
+
+          // Ajouter les nouvelles tailles
+          const sizeValues = sizes.map(size => [size, idProduit]);
+          const sqlInsertSizes = `INSERT INTO ProduitSize (size, Produit_idProduit) VALUES ?`;
+          connection.query(sqlInsertSizes, [sizeValues], (err) => {
+            if (err) {
+              console.error('Erreur lors de l\'ajout des nouvelles tailles:', err);
+              return reject('Erreur lors de l\'ajout des nouvelles tailles');
+            }
+            resolve();
+          });
+        });
+      } else {
+        resolve(); // Si pas de tailles, pas de mise à jour
+      }
+    });
+  };
+
+  // Mise à jour des couleurs du produit
+  const updateColors = (idProduit) => {
+    return new Promise((resolve, reject) => {
+      if (colors && colors.length > 0) {
+        // Supprimer les anciennes couleurs associées
+        const sqlDeleteColors = `DELETE FROM ProduitColor WHERE Produit_idProduit = ?`;
+        connection.query(sqlDeleteColors, [idProduit], (err) => {
+          if (err) {
+            console.error('Erreur lors de la suppression des anciennes couleurs:', err);
+            return reject('Erreur lors de la suppression des anciennes couleurs');
+          }
+
+          // Ajouter les nouvelles couleurs
+          const colorValues = colors.map(color => [color, idProduit]);
+          const sqlInsertColors = `INSERT INTO ProduitColor (color, Produit_idProduit) VALUES ?`;
+          connection.query(sqlInsertColors, [colorValues], (err) => {
+            if (err) {
+              console.error('Erreur lors de l\'ajout des nouvelles couleurs:', err);
+              return reject('Erreur lors de l\'ajout des nouvelles couleurs');
+            }
+            resolve();
+          });
+        });
+      } else {
+        resolve(); // Si pas de couleurs, pas de mise à jour
+      }
+    });
+  };
+
+  // Mise à jour des images : ajout des nouvelles images sans suppression des anciennes
+  const updateImages = (idProduit) => {
+    return new Promise((resolve, reject) => {
+      if (req.files && req.files.length > 0) {
+        const imagePaths = req.files.map(file => [file.path, idProduit]);
+        const sqlInsertImages = `INSERT INTO image (url, Produit_idProduit) VALUES ?`;
+        connection.query(sqlInsertImages, [imagePaths], (err) => {
+          if (err) {
+            console.error('Erreur lors de l\'ajout des nouvelles images:', err);
+            return reject('Erreur lors de l\'ajout des nouvelles images');
+          }
+          resolve();
+        });
+      } else {
+        resolve(); // Si pas de nouvelles images, ne rien changer
+      }
+    });
+  };
+
+  // Exécuter la mise à jour
+  updateProduit()
+    .then(() => Promise.all([
+      updateCategories(req.params.idProduit),
+      updateColors(req.params.idProduit),
+      updateSizes(req.params.idProduit),
+      updateImages(req.params.idProduit),
+    ]))
+    .then(() => {
+      res.status(200).json({ message: 'Produit modifié avec succès' });
+    })
+    .catch((errMessage) => {
+      res.status(500).json({ message: errMessage });
+    });
+});
+
+
+
+// Route pour supprimer un produit
+router.delete('/supprimerProduit/:idProduit', (req, res) => {
+  const { idProduit } = req.params;
+
+  if (!idProduit) {
+    return res.status(400).json({ message: 'L\'ID du produit est requis' });
+  }
+
+  // Supprimer les associations liées au produit
+  const deleteAssociations = () => {
+    return new Promise((resolve, reject) => {
+      const sqlDeleteAssociations = `
+        DELETE FROM ProduitCategorie WHERE Produit_idProduit = ?;
+        DELETE FROM ProduitColor WHERE Produit_idProduit = ?;
+        DELETE FROM ProduitSize WHERE Produit_idProduit = ?;
+        DELETE FROM image WHERE Produit_idProduit = ?;
+      `;
+      connection.query(sqlDeleteAssociations, [idProduit, idProduit, idProduit, idProduit], (err) => {
+        if (err) {
+          console.error('Erreur lors de la suppression des associations liées au produit:', err);
+          return reject('Erreur lors de la suppression des associations');
+        }
+        resolve();
+      });
+    });
+  };
+
+  // Supprimer le produit
+  const deleteProduit = () => {
+    return new Promise((resolve, reject) => {
+      const sqlDeleteProduit = `DELETE FROM produit WHERE idProduit = ?`;
+      connection.query(sqlDeleteProduit, [idProduit], (err) => {
+        if (err) {
+          console.error('Erreur lors de la suppression du produit:', err);
+          return reject('Erreur lors de la suppression du produit');
+        }
+        resolve();
+      });
+    });
+  };
+
+  // Exécuter la suppression
+  deleteAssociations()
+    .then(deleteProduit)
+    .then(() => {
+      res.status(200).json({ message: 'Produit supprimé avec succès' });
+    })
+    .catch((errMessage) => {
+      res.status(500).json({ message: errMessage });
+    });
+});
+
 
 module.exports = router;
