@@ -279,17 +279,30 @@ router.get('/produitsBoutique/:idBoutique', (req, res) => {
   });
 });
 
-
-
+// route pour modifier un produit
 router.put('/modifierProduit/:idProduit', upload.array('images', 10), (req, res) => {
-  const { nom, description, prix, idBoutique, colors, sizes } = req.body;
-  let categories;
+  const { nom, description, prix, idBoutique } = req.body;
+  let categories, colors, sizes;
 
-  // S'assurer que les catégories sont un tableau JSON valide
+  // Analyser les catégories
   try {
     categories = JSON.parse(req.body.categories);
   } catch (error) {
     return res.status(400).json({ message: 'Les catégories doivent être un tableau JSON valide' });
+  }
+
+  // Analyser les couleurs
+  try {
+    colors = JSON.parse(req.body.colors);
+  } catch (error) {
+    colors = []; // Définir un tableau vide si l'analyse échoue
+  }
+
+  // Analyser les tailles
+  try {
+    sizes = JSON.parse(req.body.sizes);
+  } catch (error) {
+    sizes = []; // Définir un tableau vide si l'analyse échoue
   }
 
   // Mise à jour du produit dans la base de données
@@ -314,21 +327,37 @@ router.put('/modifierProduit/:idProduit', upload.array('images', 10), (req, res)
   const updateCategories = (idProduit) => {
     return new Promise((resolve, reject) => {
       if (categories && categories.length > 0) {
+        // Supprimer les anciennes associations de catégories
         const sqlDeleteCategories = `DELETE FROM ProduitCategorie WHERE Produit_idProduit = ?`;
         connection.query(sqlDeleteCategories, [idProduit], (err) => {
           if (err) {
             console.error('Erreur lors de la suppression des anciennes catégories:', err);
             return reject('Erreur lors de la suppression des anciennes catégories');
           }
-
-          const categoryValues = categories.map(cat => [idProduit, cat]);
-          const sqlInsertCategories = `INSERT INTO ProduitCategorie (Produit_idProduit, Categorie_idCategorie) VALUES ?`;
-          connection.query(sqlInsertCategories, [categoryValues], (err) => {
+  
+          // Récupérer les IDs des catégories en fonction de leurs noms
+          const sqlGetCategoryIds = `SELECT idCategorie FROM Categorie WHERE nom IN (?)`;
+          connection.query(sqlGetCategoryIds, [categories], (err, results) => {
             if (err) {
-              console.error('Erreur lors de l\'ajout des nouvelles catégories:', err);
-              return reject('Erreur lors de l\'ajout des nouvelles catégories');
+              console.error('Erreur lors de la récupération des IDs des catégories:', err);
+              return reject('Erreur lors de la récupération des IDs des catégories');
             }
-            resolve();
+  
+            const categoryIds = results.map(row => row.idCategorie);
+            if (categoryIds.length === 0) {
+              return resolve(); // Aucune catégorie trouvée, rien à insérer
+            }
+  
+            // Associer les catégories trouvées au produit
+            const categoryValues = categoryIds.map(catId => [idProduit, catId]);
+            const sqlInsertCategories = `INSERT INTO ProduitCategorie (Produit_idProduit, Categorie_idCategorie) VALUES ?`;
+            connection.query(sqlInsertCategories, [categoryValues], (err) => {
+              if (err) {
+                console.error('Erreur lors de l\'ajout des nouvelles catégories:', err);
+                return reject('Erreur lors de l\'ajout des nouvelles catégories');
+              }
+              resolve();
+            });
           });
         });
       } else {
@@ -336,14 +365,12 @@ router.put('/modifierProduit/:idProduit', upload.array('images', 10), (req, res)
       }
     });
   };
-
   
 
-   // Mise à jour des tailles du produit
-   const updateSizes = (idProduit) => {
+  // Mise à jour des tailles
+  const updateSizes = (idProduit) => {
     return new Promise((resolve, reject) => {
-      if (sizes && sizes.length > 0) {
-        // Supprimer les anciennes tailles associées
+      if (Array.isArray(sizes) && sizes.length > 0) {
         const sqlDeleteSizes = `DELETE FROM ProduitSize WHERE Produit_idProduit = ?`;
         connection.query(sqlDeleteSizes, [idProduit], (err) => {
           if (err) {
@@ -351,7 +378,6 @@ router.put('/modifierProduit/:idProduit', upload.array('images', 10), (req, res)
             return reject('Erreur lors de la suppression des anciennes tailles');
           }
 
-          // Ajouter les nouvelles tailles
           const sizeValues = sizes.map(size => [size, idProduit]);
           const sqlInsertSizes = `INSERT INTO ProduitSize (size, Produit_idProduit) VALUES ?`;
           connection.query(sqlInsertSizes, [sizeValues], (err) => {
@@ -368,11 +394,10 @@ router.put('/modifierProduit/:idProduit', upload.array('images', 10), (req, res)
     });
   };
 
-  // Mise à jour des couleurs du produit
+  // Mise à jour des couleurs
   const updateColors = (idProduit) => {
     return new Promise((resolve, reject) => {
-      if (colors && colors.length > 0) {
-        // Supprimer les anciennes couleurs associées
+      if (Array.isArray(colors) && colors.length > 0) {
         const sqlDeleteColors = `DELETE FROM ProduitColor WHERE Produit_idProduit = ?`;
         connection.query(sqlDeleteColors, [idProduit], (err) => {
           if (err) {
@@ -380,7 +405,6 @@ router.put('/modifierProduit/:idProduit', upload.array('images', 10), (req, res)
             return reject('Erreur lors de la suppression des anciennes couleurs');
           }
 
-          // Ajouter les nouvelles couleurs
           const colorValues = colors.map(color => [color, idProduit]);
           const sqlInsertColors = `INSERT INTO ProduitColor (color, Produit_idProduit) VALUES ?`;
           connection.query(sqlInsertColors, [colorValues], (err) => {
@@ -397,7 +421,7 @@ router.put('/modifierProduit/:idProduit', upload.array('images', 10), (req, res)
     });
   };
 
-  // Mise à jour des images : ajout des nouvelles images sans suppression des anciennes
+  // Mise à jour des images
   const updateImages = (idProduit) => {
     return new Promise((resolve, reject) => {
       if (req.files && req.files.length > 0) {
@@ -416,12 +440,12 @@ router.put('/modifierProduit/:idProduit', upload.array('images', 10), (req, res)
     });
   };
 
-  // Exécuter la mise à jour
+  // Exécuter toutes les mises à jour
   updateProduit()
     .then(() => Promise.all([
       updateCategories(req.params.idProduit),
-      updateColors(req.params.idProduit),
       updateSizes(req.params.idProduit),
+      updateColors(req.params.idProduit),
       updateImages(req.params.idProduit),
     ]))
     .then(() => {
@@ -431,6 +455,7 @@ router.put('/modifierProduit/:idProduit', upload.array('images', 10), (req, res)
       res.status(500).json({ message: errMessage });
     });
 });
+
 
 
 
